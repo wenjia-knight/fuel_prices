@@ -13,7 +13,7 @@ def is_file_exists(bucket_name, key):
         return True
     except s3.exceptions.ClientError:
         return False
-
+    
 # extract retailer name from URL    
 def extract_retailer(url):
     domain_parts = url.split('//')[1].split('/')[0].split('.')
@@ -22,7 +22,6 @@ def extract_retailer(url):
             return domain_parts[i - 1]
     return "unknown_retailer"
 
-# download file from URL and upload to S3 bucket
 def download(url):
     try:
         response = requests.get(url,timeout=30)
@@ -37,17 +36,14 @@ def download(url):
         last_updated = data["last_updated"].replace(" ", "T")
         retailer = extract_retailer(url)
         file_name = f"{retailer}_fuel_prices_{last_updated}.json"
-        bucket_name = "s3-bucket-fuel-prices"
-        folder_name = "json-files"
-        s3_key = f"{folder_name}/{file_name}"
+        bucket_name = "fuel-prices-files-bucket-manual"
 
-
-
-        if is_file_exists(bucket_name, s3_key):
-            print(f"File {file_name} already exists in {bucket_name}/{folder_name}. Skipping upload.")
+        if is_file_exists(bucket_name, file_name):
+            print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            s3.put_object(Bucket=bucket_name, Key=s3_key, Body=str(data))
-            print(f"Uploaded {file_name} to {folder_name} in {bucket_name}")
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=str(data))
+            print(f"Uploaded {file_name} to {bucket_name}")
+
     except requests.exceptions.Timeout:
         print(f"Request timed out error for {url}")
     except requests.exceptions.RequestException as e:
@@ -58,7 +54,6 @@ def download(url):
 def download_all(urls):
     for url in urls:
         download(url)
-
 
 if __name__ == "__main__":
     urls = [
