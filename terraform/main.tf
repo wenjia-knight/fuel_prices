@@ -80,7 +80,7 @@ resource "aws_lambda_function" "fetch_fuel_prices" {
   role          = aws_iam_role.lambda.arn
   handler       = "function.lambda_handler"
   runtime       = "python3.12"
-  timeout = 10
+  timeout = 60
 }
 
 # CloudWatch Event to trigger Lambda daily at 12 noon.
