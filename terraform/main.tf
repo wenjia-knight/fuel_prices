@@ -12,8 +12,13 @@ provider "aws" {
   region = var.region_name
 }
 
-
-# Create a S3 bucket for the the files to land
+#define variables
+locals {
+  layer_zip_path    = "layer.zip"
+  layer_name        = "lambda_layer"
+  requirements_path = "${path.module}/../requirements.txt"
+}
+# Create a S3 bucket for the raw JSON files to land
 resource "aws_s3_bucket" "source_bucket" {
   bucket        = "fuel-prices-files-bucket"
   force_destroy = true
@@ -73,6 +78,41 @@ resource "aws_iam_role_policy_attachment" "attach_iam_policy_to_iam_role" {
   policy_arn = aws_iam_policy.lambda.arn
 }
 
+# create zip file from requirements.txt. Triggers only when the file is updated
+resource "null_resource" "lambda_layer" {
+  triggers = {
+    requirements = filesha1(local.requirements_path)
+  }
+  # the command to install python and dependencies to the machine and zips
+  provisioner "local-exec" {
+    command = <<EOT
+        echo "creating layers with requirements.txt packages..."
+
+        cd ..
+
+        # Create and activate virtual environment...
+        python -m venv python
+        source python/bin/activate
+
+        # Installing python dependencies...
+        
+        pip install -r requirements.txt
+        zip -r layer.zip python
+
+        # Deactivate virtual environment...
+        deactivate
+
+        #deleting the python dist package modules
+        rm -rf python
+    EOT
+  }
+}
+
+resource "aws_lambda_layer_version" "lambda_layer" {
+  filename   = "${path.module}/../layer.zip"
+  layer_name = "lambda_layer"
+}
+
 # Create a lambda function to process the data
 resource "aws_lambda_function" "fetch_fuel_prices" {
   filename      = "../lambda/function.zip"
@@ -81,6 +121,11 @@ resource "aws_lambda_function" "fetch_fuel_prices" {
   handler       = "function.lambda_handler"
   runtime       = "python3.12"
   timeout = 60
+    ## lambda layer alread diclared and attached 
+  depends_on = [null_resource.lambda_layer]
+
+  layers = [aws_lambda_layer_version.lambda_layer.arn]
+
 }
 
 # CloudWatch Event to trigger Lambda daily at 12 noon.

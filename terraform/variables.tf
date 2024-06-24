@@ -3,3 +3,9 @@ variable "region_name" {
   type        = string
   default     = "eu-west-2"
 }
+
+variable "lambda_runtime" {
+  description = "The runtime for the lambda function."
+  type        = string
+  default     = "python3.12"
+}
