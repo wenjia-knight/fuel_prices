@@ -22,12 +22,22 @@ def extract_retailer(url):
             return domain_parts[i - 1]
     return "unknown_retailer"
 
+# Remove single quotes from the brand field inside stations
+def remove_single_quotes_from_brand(data):
+    if "stations" in data:
+        for station in data["stations"]:
+            if "brand" in station and isinstance(station["brand"], str):
+                station["brand"] = station["brand"].replace("'", "")
+    return data
+
 def download(url):
     try:
         response = requests.get(url,timeout=2)
         response.raise_for_status()
 
         data = response.json()
+
+        data = remove_single_quotes_from_brand(data)
 
         # Convert 'last_updated' to yyyy-mm-dd hh:mm:ss format
         last_updated_str = data["last_updated"]
@@ -41,7 +51,8 @@ def download(url):
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            s3.put_object(Bucket=bucket_name, Key=file_name, Body=str(data))
+            json_data = json.dumps(data)
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=json_data, ContentType='application/json')
             print(f"Uploaded {file_name} to {bucket_name}")
 
     except requests.exceptions.Timeout:
@@ -67,6 +78,7 @@ def lambda_handler(event, context):
         "https://moto-way.com/fuel-price/fuel_prices.json",
         "https://fuel.motorfuelgroup.com/fuel_prices_data.json",
         "https://www.rontec-servicestations.co.uk/fuel-prices/data/fuel_prices_data.json",
+        "https://api.sainsburys.co.uk/v1/exports/latest/fuel_prices_data.json",
         "https://www.sgnretail.uk/files/data/SGN_daily_fuel_prices.json",
         "https://www.shell.co.uk/fuel-prices-data.html",
         "https://www.tesco.com/fuel_prices/fuel_prices_data.json"
