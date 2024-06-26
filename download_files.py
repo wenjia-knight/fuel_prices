@@ -41,7 +41,7 @@ def download(url):
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            s3.put_object(Bucket=bucket_name, Key=file_name, Body=str(data))
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=json.dumps(data))
             print(f"Uploaded {file_name} to {bucket_name}")
 
     except requests.exceptions.Timeout:
