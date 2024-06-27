@@ -120,6 +120,7 @@ resource "aws_lambda_function" "fetch_fuel_prices" {
   role          = aws_iam_role.lambda.arn
   handler       = "function.lambda_handler"
   runtime       = "python3.12"
+  source_code_hash = filebase64sha256("../lambda/function.zip")
   timeout = 60
     ## lambda layer alread diclared and attached 
   depends_on = [null_resource.lambda_layer]

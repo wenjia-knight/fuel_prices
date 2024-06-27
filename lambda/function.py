@@ -22,6 +22,11 @@ def extract_retailer(url):
             return domain_parts[i - 1]
     return "unknown_retailer"
 
+# Convert dd/mm/yyyy hh:mm:ss to yyyy-mm-dd hh:mm:ss format
+def parse_date(date_string):
+    dt = datetime.strptime(date_string, '%d/%m/%Y %H:%M:%S')
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
+
 def download(url):
     try:
         response = requests.get(url,timeout=2)
@@ -29,11 +34,10 @@ def download(url):
 
         data = response.json()
 
-        # Convert 'last_updated' to yyyy-mm-dd hh:mm:ss format
-        last_updated_str = data["last_updated"]
-        last_updated_dt = datetime.strptime(last_updated_str, '%d/%m/%Y %H:%M:%S')
-        data["last_updated"] = last_updated_dt.strftime('%Y-%m-%d %H:%M:%S')
+        data["last_updated"] = parse_date(data["last_updated"])
+
         last_updated = data["last_updated"].replace(" ", "T")
+
         retailer = extract_retailer(url)
         file_name = f"{retailer}_fuel_prices_{last_updated}.json"
         bucket_name = "fuel-prices-files-bucket"
@@ -41,7 +45,7 @@ def download(url):
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            s3.put_object(Bucket=bucket_name, Key=file_name, Body=str(data))
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=response.content, ContentType='application/json')
             print(f"Uploaded {file_name} to {bucket_name}")
 
     except requests.exceptions.Timeout:
@@ -67,6 +71,7 @@ def lambda_handler(event, context):
         "https://moto-way.com/fuel-price/fuel_prices.json",
         "https://fuel.motorfuelgroup.com/fuel_prices_data.json",
         "https://www.rontec-servicestations.co.uk/fuel-prices/data/fuel_prices_data.json",
+        "https://api.sainsburys.co.uk/v1/exports/latest/fuel_prices_data.json",
         "https://www.sgnretail.uk/files/data/SGN_daily_fuel_prices.json",
         "https://www.shell.co.uk/fuel-prices-data.html",
         "https://www.tesco.com/fuel_prices/fuel_prices_data.json"
