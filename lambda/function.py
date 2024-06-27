@@ -25,7 +25,8 @@ def extract_retailer(url):
 # Convert dd/mm/yyyy hh:mm:ss to yyyy-mm-dd hh:mm:ss format
 def parse_date(date_string):
     dt = datetime.strptime(date_string, '%d/%m/%Y %H:%M:%S')
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
+    new_date = dt.strftime('%Y-%m-%d %H:%M:%S')
+    return new_date
 
 def download(url):
     try:
@@ -45,7 +46,7 @@ def download(url):
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            s3.put_object(Bucket=bucket_name, Key=file_name, Body=response.content, ContentType='application/json')
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=json.dumps(data), ContentType='application/json')
             print(f"Uploaded {file_name} to {bucket_name}")
 
     except requests.exceptions.Timeout:

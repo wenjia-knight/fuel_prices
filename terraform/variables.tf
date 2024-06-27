@@ -9,3 +9,22 @@ variable "lambda_runtime" {
   type        = string
   default     = "python3.12"
 }
+
+variable "landing_bucket_name" {
+  description = "The name of the landing bucket for storing raw files."
+  type        = string
+  default     = "fuel-prices-files-bucket"
+}
+
+variable "target_bucket_name" {
+  description = "The name of the target bucket for storing processed files."
+  type        = string
+  default     = "fuel-prices-processed-bucket"
+  
+}
+variable "athena_outputs_bucket_name" {
+  description = "The name of the bucket for storing Athena outputs."
+  type        = string
+  default     = "fuel-prices-athenaoutputs-bucket"
+}
+
