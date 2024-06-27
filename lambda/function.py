@@ -22,13 +22,10 @@ def extract_retailer(url):
             return domain_parts[i - 1]
     return "unknown_retailer"
 
-# Remove single quotes from the brand field inside stations
-def remove_single_quotes_from_brand(data):
-    if "stations" in data:
-        for station in data["stations"]:
-            if "brand" in station and isinstance(station["brand"], str):
-                station["brand"] = station["brand"].replace("'", "")
-    return data
+# Convert dd/mm/yyyy hh:mm:ss to yyyy-mm-dd hh:mm:ss format
+def parse_date(date_string):
+    dt = datetime.strptime(date_string, '%d/%m/%Y %H:%M:%S')
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 def download(url):
     try:
@@ -37,13 +34,10 @@ def download(url):
 
         data = response.json()
 
-        data = remove_single_quotes_from_brand(data)
+        data["last_updated"] = parse_date(data["last_updated"])
 
-        # Convert 'last_updated' to yyyy-mm-dd hh:mm:ss format
-        last_updated_str = data["last_updated"]
-        last_updated_dt = datetime.strptime(last_updated_str, '%d/%m/%Y %H:%M:%S')
-        data["last_updated"] = last_updated_dt.strftime('%Y-%m-%d %H:%M:%S')
         last_updated = data["last_updated"].replace(" ", "T")
+
         retailer = extract_retailer(url)
         file_name = f"{retailer}_fuel_prices_{last_updated}.json"
         bucket_name = "fuel-prices-files-bucket"
@@ -51,8 +45,7 @@ def download(url):
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
         else:
-            json_data = json.dumps(data)
-            s3.put_object(Bucket=bucket_name, Key=file_name, Body=json_data, ContentType='application/json')
+            s3.put_object(Bucket=bucket_name, Key=file_name, Body=response.content, ContentType='application/json')
             print(f"Uploaded {file_name} to {bucket_name}")
 
     except requests.exceptions.Timeout:
