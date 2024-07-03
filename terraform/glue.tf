@@ -25,7 +25,8 @@ resource "aws_iam_policy" "glue_policy" {
           aws_s3_bucket.landing_bucket.arn,
           "${aws_s3_bucket.landing_bucket.arn}/*",
           aws_s3_bucket.target_bucket.arn,
-          "${aws_s3_bucket.target_bucket.arn}/*"
+          "${aws_s3_bucket.target_bucket.arn}/*",
+          "arn:aws:s3:::aws-glue-assets-240998004757-eu-west-2/*"
         ]
       },
       {
