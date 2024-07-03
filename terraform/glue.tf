@@ -47,6 +47,22 @@ resource "aws_iam_policy" "glue_policy" {
           "logs:PutLogEvents"
         ]
         Resource = ["arn:aws:logs:*:*:/aws-glue/*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codewhisperer:GenerateRecommendations",
+          "codewhisperer:CreateCodeScan",
+          "codewhisperer:GetCodeScan",
+          "codewhisperer:ListCodeScanFindings",
+          "codewhisperer:ListRecommendations",
+          "cloudwatch:PutMetricData",
+          "codecatalyst:GetProject",
+          "codecatalyst:ListProjects",
+          "codecatalyst:GetSpace",
+          "codecatalyst:ListSpaces"
+        ]
+        Resource = "*"
       }
     ]
   })
