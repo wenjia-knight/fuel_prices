@@ -1,4 +1,4 @@
-data "aws_iam_policy_document" "assume_role" {
+data "aws_iam_policy_document" "lambda_assume_role" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -8,6 +8,18 @@ data "aws_iam_policy_document" "assume_role" {
     }
   }
 }
+
+data "aws_iam_policy_document" "glue_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["glue.amazonaws.com"]
+    }
+  }
+}
+
 
 data "archive_file" "zip_the_python_code" {
   type        = "zip"

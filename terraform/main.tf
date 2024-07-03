@@ -19,14 +19,19 @@ locals {
   requirements_path = "${path.module}/../requirements.txt"
 }
 # Create a S3 bucket for the raw JSON files to land
-resource "aws_s3_bucket" "source_bucket" {
-  bucket        = "fuel-prices-files-bucket"
+resource "aws_s3_bucket" "landing_bucket" {
+  bucket        = var.landing_bucket_name
+  force_destroy = true
+}
+
+resource "aws_s3_bucket" "target_bucket" {
+  bucket        = var.target_bucket_name
   force_destroy = true
 }
 
 # Create a S3 bucket for athena outputs
-resource "aws_s3_bucket" "destination_bucket" {
-  bucket        = "fuel-prices-athenaoutputs-bucket"
+resource "aws_s3_bucket" "athena_outputs_bucket" {
+  bucket        = var.athena_outputs_bucket_name
   force_destroy = true
 }
 
@@ -36,8 +41,9 @@ resource "aws_iam_role" "lambda" {
 
   # Terraform's "jsonencode" function converts a
   # Terraform expression result to valid JSON syntax.
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
+
 
 # Give the lambda function permission to read and write to the S3 buckets
 resource "aws_iam_policy" "lambda" {
@@ -53,10 +59,10 @@ resource "aws_iam_policy" "lambda" {
           "s3:GetObject"
         ],
         Resource = [
-          aws_s3_bucket.source_bucket.arn,
-          "${aws_s3_bucket.source_bucket.arn}/*",
-          aws_s3_bucket.destination_bucket.arn,
-          "${aws_s3_bucket.destination_bucket.arn}/*"
+          aws_s3_bucket.landing_bucket.arn,
+          "${aws_s3_bucket.landing_bucket.arn}/*",
+          aws_s3_bucket.target_bucket.arn,
+          "${aws_s3_bucket.target_bucket.arn}/*"
         ],
       },
       {
