@@ -35,6 +35,18 @@ resource "aws_s3_bucket" "athena_outputs_bucket" {
   force_destroy = true
 }
 
+# Create a S3 bucket for storing glue script
+resource "aws_s3_bucket" "glue_script_bucket" {
+  bucket        = var.glue_script_bucket_name
+  force_destroy = true
+}
+# Upload the glue job script to the S3 bucket
+resource "aws_s3_object" "glue_script" {
+  bucket = aws_s3_bucket.glue_script_bucket.bucket
+  key    = "glue-job-script.py"
+  source = "../glue_script/glue_job_script.py"
+  etag = filemd5("../glue_script/glue_job_script.py")
+}
 # Assigning IAM role to the lambda function
 resource "aws_iam_role" "lambda" {
   name = "lambda"
@@ -121,14 +133,14 @@ resource "aws_lambda_layer_version" "lambda_layer" {
 
 # Create a lambda function to process the data
 resource "aws_lambda_function" "fetch_fuel_prices" {
-  filename      = "../lambda/function.zip"
-  function_name = "fetch_fuel_prices"
-  role          = aws_iam_role.lambda.arn
-  handler       = "function.lambda_handler"
-  runtime       = "python3.12"
+  filename         = "../lambda/function.zip"
+  function_name    = "fetch_fuel_prices"
+  role             = aws_iam_role.lambda.arn
+  handler          = "function.lambda_handler"
+  runtime          = "python3.12"
   source_code_hash = filebase64sha256("../lambda/function.zip")
-  timeout = 60
-    ## lambda layer alread diclared and attached 
+  timeout          = 60
+  ## lambda layer alread diclared and attached 
   depends_on = [null_resource.lambda_layer]
 
   layers = [aws_lambda_layer_version.lambda_layer.arn]
