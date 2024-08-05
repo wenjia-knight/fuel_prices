@@ -28,3 +28,8 @@ variable "athena_outputs_bucket_name" {
   default     = "fuel-prices-athenaoutputs-bucket"
 }
 
+variable "glue_script_bucket_name" {
+  description = "The name of the bucket for storing glue script."
+  type        = string
+  default     = "fuel-prices-glue-script-bucket"
+}
