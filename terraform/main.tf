@@ -168,3 +168,8 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily_12pm.arn
 }
+
+# Create a Glue Catalog Database
+resource "aws_glue_catalog_database" "glue_catalog_database" {
+  name = "fuel_prices_database"
+}
