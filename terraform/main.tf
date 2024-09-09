@@ -9,7 +9,8 @@ terraform {
 
 # Configure the AWS Provider
 provider "aws" {
-  region = var.region_name
+  region  = var.region_name
+  profile = "AdministratorAccess-953264846691"
 }
 
 #define variables
@@ -18,35 +19,7 @@ locals {
   layer_name        = "lambda_layer"
   requirements_path = "${path.module}/../requirements.txt"
 }
-# Create a S3 bucket for the raw JSON files to land
-resource "aws_s3_bucket" "landing_bucket" {
-  bucket        = var.landing_bucket_name
-  force_destroy = true
-}
 
-resource "aws_s3_bucket" "target_bucket" {
-  bucket        = var.target_bucket_name
-  force_destroy = true
-}
-
-# Create a S3 bucket for athena outputs
-resource "aws_s3_bucket" "athena_outputs_bucket" {
-  bucket        = var.athena_outputs_bucket_name
-  force_destroy = true
-}
-
-# Create a S3 bucket for storing glue script
-resource "aws_s3_bucket" "glue_script_bucket" {
-  bucket        = var.glue_script_bucket_name
-  force_destroy = true
-}
-# Upload the glue job script to the S3 bucket
-resource "aws_s3_object" "glue_script" {
-  bucket = aws_s3_bucket.glue_script_bucket.bucket
-  key    = "glue-job-script.py"
-  source = "../glue_script/glue_job_script.py"
-  etag = filemd5("../glue_script/glue_job_script.py")
-}
 # Assigning IAM role to the lambda function
 resource "aws_iam_role" "lambda" {
   name = "lambda"
@@ -171,5 +144,14 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
 
 # Create a Glue Catalog Database
 resource "aws_glue_catalog_database" "glue_catalog_database" {
-  name = "fuel_prices_database"
+  name = "fuel_prices_database_wk"
+}
+
+resource "aws_athena_workgroup" "fuel_prices_workgroup" {
+  name = "fuel_prices_workgroup"
+  configuration {
+    result_configuration {
+      output_location = "s3://${aws_s3_bucket.athena_outputs_bucket.bucket}/"
+    }
+  }
 }

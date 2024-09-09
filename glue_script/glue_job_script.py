@@ -4,29 +4,29 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from awsglue.job import Job
 from awsglue.dynamicframe import DynamicFrame
 from pyspark.sql.functions import explode, col, to_date, date_format, lit
 from pyspark.sql.types import DoubleType
 import boto3
 from datetime import datetime, timezone
+import traceback
 
-args = getResolvedOptions(sys.argv, ['JOB_NAME'])
-sc = SparkContext.getOrCreate()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
-job = Job(glueContext)
-job.init(args['JOB_NAME'], args)
+def initialise_spark(args):
+    sc = SparkContext.getOrCreate()
+    glueContext = GlueContext(sc)
+    spark = glueContext.spark_session
+    job = Job(glueContext)
+    job.init(args['JOB_NAME'], args)
+    return glueContext, spark, job
 
-# S3 bucket that contains the raw data
-bucket = 'fuel-prices-files-bucket'
+def get_s3_client():
+    return boto3.client('s3')
 
-# Initialise s3 and glue clients
-s3_client = boto3.client('s3')
-glue_client = boto3.client('glue')
+def get_glue_client():
+    return boto3.client('glue')
 
 # Function to get the last run time from text file saved in S3
-def get_last_run_time(job_name, bucket_name):
+def get_last_run_time(s3_client, job_name, bucket_name):
     file_name = f"{job_name}_last_run_time.txt"
     
     try:
@@ -41,7 +41,7 @@ def get_last_run_time(job_name, bucket_name):
         return datetime(1970, 1, 1).replace(tzinfo=timezone.utc)
 
 # Function to get the current run start time from Glue job run and use it to update the last run time file in S3
-def get_current_run_start_time(job_name, job_run_id):
+def get_current_run_start_time(glue_client, s3_client, job_name, job_run_id, bucket):
     try:
         response = glue_client.get_job_run(JobName=job_name, RunId=job_run_id)
         current_run_start_time = response['JobRun']['StartedOn'].replace(tzinfo=timezone.utc)
@@ -54,24 +54,19 @@ def get_current_run_start_time(job_name, job_run_id):
         print(f"Error getting current job run start time: {str(e)}. Use current time as the start time.")
         return datetime.now(timezone.utc)
 
-last_run_time = get_last_run_time(args['JOB_NAME'], bucket_name=bucket)
-current_run_start_time = get_current_run_start_time(args['JOB_NAME'], args['JOB_RUN_ID'])
+def get_new_files(s3_client, bucket, last_run_time):
+    response = s3_client.list_objects_v2(Bucket=bucket)
+    new_files = []
 
-# List objects in the bucket
-response = s3_client.list_objects_v2(Bucket=bucket)
+    for obj in response.get('Contents', []):
+        if obj['LastModified'].replace(tzinfo=timezone.utc) > last_run_time:
+            print(f"New file: {obj['Key']}")
+            new_files.append(f"s3://{bucket}/{obj['Key']}")
+        else:
+            print(f"Old file: {obj['Key']}")
+    return new_files
 
-new_files = []
-
-# Filter out files that are created after the last run time
-for obj in response.get('Contents', []):
-    if obj['LastModified'].replace(tzinfo=timezone.utc) > last_run_time:
-        print(f"New file: {obj['Key']}")
-        new_files.append(f"s3://{bucket}/{obj['Key']}")
-    else:
-        print(f"Old file: {obj['Key']}")
-
-# process the new files
-for file in new_files:
+def process_file(glueContext, file):
     try:
         # Read data from S3 into a Dynamic Frame
         dyf = glueContext.create_dynamic_frame.from_options(
@@ -80,8 +75,7 @@ for file in new_files:
             format="json",
             connection_options={
                 "paths": [file],
-                "recurse": True,
-                "useS3ListImplementation": True
+                "recurse": True
             },
             transformation_ctx="read_json_from_s3"
         )
@@ -120,7 +114,7 @@ for file in new_files:
             connection_type="s3",
             format="parquet",
             connection_options={
-                "path": "s3://fuel-prices-processed-bucket/",
+                "path": "s3://fuel-prices-processed-bucket-wk/",
                 "partitionKeys": ["last_updated_date"]
             },
             transformation_ctx="write_to_s3"
@@ -128,5 +122,23 @@ for file in new_files:
         print(f"Processed file: {file}")
     except Exception as e:
         print(f"Error processing file {file}: {e}")
+        traceback.print_exc()
 
-job.commit()
+def main():
+    args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+    glueContext, spark, job = initialise_spark(args)
+    # S3 bucket that contains the raw data
+    bucket = "fuel-prices-raw-bucket-wk"
+    s3_client = get_s3_client()
+    glue_client = get_glue_client()
+
+    last_run_time = get_last_run_time(s3_client=s3_client, job_name=args['JOB_NAME'], bucket_name=bucket)
+    get_current_run_start_time(glue_client=glue_client, s3_client=s3_client, job_name=args['JOB_NAME'], job_run_id=args['JOB_RUN_ID'], bucket=bucket)
+    
+    new_files = get_new_files(s3_client, bucket, last_run_time)
+    for file in new_files:
+        process_file(glueContext, file)
+    job.commit()
+
+if __name__ == "__main__":
+    main()

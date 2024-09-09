@@ -41,7 +41,7 @@ def download(url):
 
         retailer = extract_retailer(url)
         file_name = f"{retailer}_fuel_prices_{last_updated}.json"
-        bucket_name = "fuel-prices-files-bucket"
+        bucket_name = "fuel-prices-raw-bucket-wk"
 
         if is_file_exists(bucket_name, file_name):
             print(f"File {file_name} already exists in {bucket_name}. Skipping upload.")
