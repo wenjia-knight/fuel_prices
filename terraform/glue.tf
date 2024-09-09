@@ -26,7 +26,6 @@ resource "aws_iam_policy" "glue_policy" {
           "${aws_s3_bucket.landing_bucket.arn}/*",
           aws_s3_bucket.target_bucket.arn,
           "${aws_s3_bucket.target_bucket.arn}/*",
-          "arn:aws:s3:::aws-glue-assets-240998004757-eu-west-2/*",
           "${aws_s3_bucket.glue_script_bucket.arn}/*"
         ]
       },
@@ -65,7 +64,7 @@ resource "aws_iam_policy" "glue_policy" {
           "codecatalyst:ListSpaces"
         ]
         Resource = "*"
-      }, 
+      },
       {
         Effect = "Allow"
         Action = [
@@ -92,37 +91,37 @@ resource "aws_iam_role_policy_attachment" "glue_attach" {
 
 # Create a Glue job
 resource "aws_glue_job" "my_glue_job" {
-  name        = "from-raw-to-processed"
-  role_arn    = aws_iam_role.glue_role.arn
+  name     = "from-raw-to-processed"
+  role_arn = aws_iam_role.glue_role.arn
   command {
     name            = "glueetl"
     script_location = "s3://${var.glue_script_bucket_name}/glue-job-script.py"
     python_version  = "3"
   }
 
-  max_retries          = 1
-  glue_version         = "4.0"
-  number_of_workers    = 10
-  worker_type          = "G.1X"
-  timeout              = 2880
+  max_retries       = 1
+  glue_version      = "4.0"
+  number_of_workers = 10
+  worker_type       = "G.1X"
+  timeout           = 2880
 }
 
 # start glue job on schedule daily
 resource "aws_glue_trigger" "start_glue_job_trigger" {
   name     = "start-glue-job-trigger"
   type     = "SCHEDULED"
-  schedule = "cron(15 12 * * ? *)"  # Daily at 12:15 UTC
+  schedule = "cron(15 12 * * ? *)" # Daily at 12:15 UTC
   actions {
     job_name = aws_glue_job.my_glue_job.name
   }
   workflow_name = aws_glue_workflow.my_glue_workflow.name
-  depends_on = [ aws_glue_job.my_glue_job ]
+  depends_on    = [aws_glue_job.my_glue_job]
 }
 
 # Trigger the glue crawler after the glue job is completed
 resource "aws_glue_trigger" "trigger_crawler" {
-  name     = "trigger-crawler"
-  type     = "CONDITIONAL"
+  name = "trigger-crawler"
+  type = "CONDITIONAL"
   predicate {
     conditions {
       job_name = aws_glue_job.my_glue_job.name

@@ -9,6 +9,7 @@ from pyspark.sql.functions import explode, col, to_date, date_format, lit
 from pyspark.sql.types import DoubleType
 import boto3
 from datetime import datetime, timezone
+import traceback
 
 def initialise_spark(args):
     sc = SparkContext.getOrCreate()
@@ -74,8 +75,7 @@ def process_file(glueContext, file):
             format="json",
             connection_options={
                 "paths": [file],
-                "recurse": True,
-                "useS3ListImplementation": True
+                "recurse": True
             },
             transformation_ctx="read_json_from_s3"
         )
@@ -114,7 +114,7 @@ def process_file(glueContext, file):
             connection_type="s3",
             format="parquet",
             connection_options={
-                "path": "s3://fuel-prices-processed-bucket/",
+                "path": "s3://fuel-prices-processed-bucket-wk/",
                 "partitionKeys": ["last_updated_date"]
             },
             transformation_ctx="write_to_s3"
@@ -122,12 +122,13 @@ def process_file(glueContext, file):
         print(f"Processed file: {file}")
     except Exception as e:
         print(f"Error processing file {file}: {e}")
+        traceback.print_exc()
 
 def main():
     args = getResolvedOptions(sys.argv, ['JOB_NAME'])
     glueContext, spark, job = initialise_spark(args)
     # S3 bucket that contains the raw data
-    bucket = 'fuel-prices-files-bucket'
+    bucket = "fuel-prices-raw-bucket-wk"
     s3_client = get_s3_client()
     glue_client = get_glue_client()
 
