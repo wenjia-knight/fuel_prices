@@ -5,7 +5,7 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.dynamicframe import DynamicFrame
-from pyspark.sql.functions import explode, col, to_date, date_format, lit
+from pyspark.sql.functions import explode, col, to_date, date_format, lit, initcap, trim
 from pyspark.sql.types import DoubleType
 import boto3
 from datetime import datetime, timezone
@@ -90,7 +90,7 @@ def process_file(glueContext, file):
         selected_columns = [
             col("last_updated"),
             col("station.site_id"),
-            col("station.brand"),
+            initcap(trim(col("station.brand"))).alias("brand"),
             col("station.address"),
             col("station.postcode"),
             col("station.location.latitude").cast(DoubleType()).alias("latitude"),
