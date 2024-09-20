@@ -72,7 +72,7 @@ resource "aws_iam_role_policy_attachment" "attach_iam_policy_to_iam_role" {
 # create zip file from requirements.txt. Triggers only when the file is updated
 resource "null_resource" "lambda_layer" {
   triggers = {
-    requirements = filesha1(local.requirements_path)
+    requirements_hash = filebase64sha256(local.requirements_path)
   }
   # the command to install python and dependencies to the machine and zips
   provisioner "local-exec" {
@@ -100,8 +100,10 @@ resource "null_resource" "lambda_layer" {
 }
 
 resource "aws_lambda_layer_version" "lambda_layer" {
-  filename   = "${path.module}/../layer.zip"
-  layer_name = "lambda_layer"
+  filename         = "${path.module}/../layer.zip"
+  layer_name       = "lambda_layer"
+  source_code_hash = filebase64sha256("../layer.zip")
+  depends_on       = [null_resource.lambda_layer]
 }
 
 # Create a lambda function to process the data
@@ -109,6 +111,7 @@ resource "aws_lambda_function" "fetch_fuel_prices" {
   filename         = "../lambda/function.zip"
   function_name    = "fetch_fuel_prices"
   role             = aws_iam_role.lambda.arn
+  description      = "This function fetches the fuel prices from the gov.uk website"
   handler          = "function.lambda_handler"
   runtime          = "python3.12"
   source_code_hash = filebase64sha256("../lambda/function.zip")
@@ -120,10 +123,29 @@ resource "aws_lambda_function" "fetch_fuel_prices" {
 
 }
 
+resource "aws_lambda_function" "fetch_costco_fuel_prices" {
+  filename         = data.archive_file.zip_the_costco_python_code.output_path
+  function_name    = "fetch_costco_fuel_prices"
+  role             = aws_iam_role.lambda.arn
+  description      = "This function fetches the fuel prices from the costco website"
+  handler          = "costco.lambda_handler"
+  runtime          = "python3.12"
+  source_code_hash = filebase64sha256(data.archive_file.zip_the_costco_python_code.output_path)
+  timeout          = 300
+  depends_on       = [data.archive_file.zip_the_costco_python_code, null_resource.lambda_layer]
+  layers           = [aws_lambda_layer_version.lambda_layer.arn]
+
+}
+
 # CloudWatch Event to trigger Lambda daily at 12 noon.
 resource "aws_cloudwatch_event_rule" "daily_12pm" {
   name                = "daily_12pm"
   schedule_expression = "cron(0 12 * * ? *)"
+}
+
+resource "aws_cloudwatch_event_rule" "daily_9am" {
+  name                = "daily_9am"
+  schedule_expression = "cron(0 9 * * ? *)"
 }
 
 # CloudWatch Event Target
@@ -133,13 +155,27 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
   arn       = aws_lambda_function.fetch_fuel_prices.arn
 }
 
+resource "aws_cloudwatch_event_target" "lambda_target_costco" {
+  rule      = aws_cloudwatch_event_rule.daily_9am.name
+  target_id = aws_lambda_function.fetch_costco_fuel_prices.function_name
+  arn       = aws_lambda_function.fetch_costco_fuel_prices.arn
+}
+
 # Permission for CloudWatch to invoke Lambda
-resource "aws_lambda_permission" "allow_cloudwatch" {
+resource "aws_lambda_permission" "allow_cloudwatch_1" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.fetch_fuel_prices.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.daily_12pm.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch_2" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.fetch_costco_fuel_prices.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_9am.arn
 }
 
 # Create a Glue Catalog Database
