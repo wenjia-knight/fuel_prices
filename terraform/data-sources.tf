@@ -23,6 +23,12 @@ data "aws_iam_policy_document" "glue_assume_role" {
 
 data "archive_file" "zip_the_python_code" {
   type        = "zip"
-  source_dir  = "${path.module}/../lambda/"
+  source_file = "${path.module}/../lambda/function.py"
   output_path = "${path.module}/../lambda/function.zip"
+}
+
+data "archive_file" "zip_the_costco_python_code" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/costco.py"
+  output_path = "${path.module}/../lambda/costco.zip"
 }
