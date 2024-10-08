@@ -7,67 +7,70 @@ import boto3
 # Set up S3 client
 s3 = boto3.client("s3")
 
-def get_data(urls):
-    all_data = []
-    for url in urls:
+def get_station_data(url):
         response = requests.get(url)
-
-        if response.status_code == 200:
-            # 2. Parse the webpage using BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # 3. Extract address and postcode
-            try:
-                contact_section = soup.find('div', class_='col-xs-12 col-sm-4 col-md-5 no-padding')
-                address_lines = [span.text.strip() for span in contact_section.find_all('span') if not span.find('a')]
-                postcode = address_lines.pop()  # Extract the last line as the postcode
-                address = ", ".join(address_lines)
-            except AttributeError:
-                print("Failed to find contact details.")
-
-            # 4. Extract fuel prices based on the new structure
-            fuel_prices = {}
-            try:
-                price_boxes = soup.find_all('div', class_='col-xs-3 gas-box-padding')
-                for box in price_boxes:
-                    fuel_type = box.find('span', class_='gas-title').text.strip()
-                    price = box.find('span', class_='gas-price').text.strip()
-                    if fuel_type == "Unleaded Petrol":
-                        fuel_prices["E10"] =float(price)
-                    if fuel_type == "Premium Diesel":
-                        fuel_prices["SDV"] =float(price)
-                    if fuel_type == "Premium Unleaded Petrol":
-                        fuel_prices["E5"] =float(price)
-                    
-            except AttributeError:
-                print("Failed to extract fuel prices.")
-
-            try:
-                map_section = soup.find('div', class_='store-finder-map')
-                latitude = float(map_section['data-latitude'])
-                longitude = float(map_section['data-longitude'])
-            except (AttributeError, KeyError):
-                latitude = longitude = 'Coordinates not found'
-                print(f"Failed to extract coordinates for URL: {url}")
-
-            # 5. Prepare the data
-            station_data = {
-                "site_id": url.split('/')[-1],
-                "brand": "Costco",
-                "address": address,
-                "postcode": postcode,
-                "location": {
-                    "latitude": latitude,
-                    "longitude": longitude
-                },  
-                "prices": fuel_prices
-            }
-
-            # Add the data to the list of all fuel data
-            all_data.append(station_data) 
-        else:
+        if response.status_code != 200:
             print(f"Failed to fetch the webpage for {url}. Status code: {response.status_code}")
-    return all_data    
+            return None
+        
+        # 2. Parse the webpage using BeautifulSoup
+        soup = BeautifulSoup(response.text, 'html.parser')
+        # 3. Extract address and postcode
+        try:
+            contact_section = soup.find('div', class_='col-xs-12 col-sm-4 col-md-5 no-padding')
+            address_lines = [span.text.strip() for span in contact_section.find_all('span') if not span.find('a')]
+            postcode = address_lines.pop()  # Extract the last line as the postcode
+            address = ", ".join(address_lines)
+        except AttributeError:
+            print("Failed to find contact details.")
+
+        # 4. Extract fuel prices based on the new structure
+        fuel_prices = {}
+        try:
+            price_boxes = soup.find_all('div', class_='col-xs-3 gas-box-padding')
+            for box in price_boxes:
+                fuel_type = box.find('span', class_='gas-title').text.strip()
+                price = box.find('span', class_='gas-price').text.strip()
+                if fuel_type == "Unleaded Petrol":
+                    fuel_prices["E10"] =float(price)
+                if fuel_type == "Premium Diesel":
+                    fuel_prices["SDV"] =float(price)
+                if fuel_type == "Premium Unleaded Petrol":
+                    fuel_prices["E5"] =float(price)
+                
+        except AttributeError:
+            print("Failed to extract fuel prices.")
+
+        try:
+            map_section = soup.find('div', class_='store-finder-map')
+            latitude = float(map_section['data-latitude'])
+            longitude = float(map_section['data-longitude'])
+        except (AttributeError, KeyError):
+            latitude = longitude = 'Coordinates not found'
+            print(f"Failed to extract coordinates for URL: {url}")
+
+        # 5. Prepare the data for a single station
+        station_data = {
+            "site_id": url.split('/')[-1],
+            "brand": "Costco",
+            "address": address,
+            "postcode": postcode,
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude
+            },  
+            "prices": fuel_prices
+        }
+
+        return station_data
+
+def get_data(urls: list):
+    all_data = []   
+    for url in urls:
+        station_data = get_station_data(url)
+        if station_data:
+            all_data.append(station_data)
+    return all_data 
 
 def get_final_data(data: list):
     final_data = {

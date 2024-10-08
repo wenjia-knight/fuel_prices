@@ -143,9 +143,9 @@ resource "aws_cloudwatch_event_rule" "daily_12pm" {
   schedule_expression = "cron(0 12 * * ? *)"
 }
 
-resource "aws_cloudwatch_event_rule" "daily_9am" {
-  name                = "daily_9am"
-  schedule_expression = "cron(0 9 * * ? *)"
+resource "aws_cloudwatch_event_rule" "daily_10am" {
+  name                = "daily_10am"
+  schedule_expression = "cron(0 10 * * ? *)"
 }
 
 # CloudWatch Event Target
@@ -156,7 +156,7 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
 }
 
 resource "aws_cloudwatch_event_target" "lambda_target_costco" {
-  rule      = aws_cloudwatch_event_rule.daily_9am.name
+  rule      = aws_cloudwatch_event_rule.daily_10am.name
   target_id = aws_lambda_function.fetch_costco_fuel_prices.function_name
   arn       = aws_lambda_function.fetch_costco_fuel_prices.arn
 }
@@ -175,7 +175,7 @@ resource "aws_lambda_permission" "allow_cloudwatch_2" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.fetch_costco_fuel_prices.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.daily_9am.arn
+  source_arn    = aws_cloudwatch_event_rule.daily_10am.arn
 }
 
 # Create a Glue Catalog Database
