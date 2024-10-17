@@ -7,6 +7,7 @@ from awsglue.job import Job
 from awsglue.dynamicframe import DynamicFrame
 from pyspark.sql.functions import explode, col, to_date, date_format, lit, initcap, trim
 from pyspark.sql.types import DoubleType
+
 import boto3
 from datetime import datetime, timezone
 import traceback
@@ -66,20 +67,21 @@ def get_new_files(s3_client, bucket, last_run_time):
             print(f"Old file: {obj['Key']}")
     return new_files
 
-def process_file(glueContext, file):
+def process_file(glueContext, spark, file):
     try:
         # Read data from S3 into a Dynamic Frame
-        dyf = glueContext.create_dynamic_frame.from_options(
-            format_options={"multiline": True},
-            connection_type="s3",
-            format="json",
-            connection_options={
-                "paths": [file],
-                "recurse": True
-            },
-            transformation_ctx="read_json_from_s3"
-        )
-        df = dyf.toDF()
+        # dyf = glueContext.create_dynamic_frame.from_options(
+        #     format_options={"multiline": True},
+        #     connection_type="s3",
+        #     format="json",
+        #     connection_options={
+        #         "paths": [file],
+        #         "recurse": True
+        #     },
+        #     transformation_ctx="read_json_from_s3"
+        # )
+        df = spark.read.json(file)
+        # df = dyf.toDF()
         # Flatten the nested 'stations' array
         df_exploded = df.withColumn("station", explode(col("stations")))
 
@@ -101,9 +103,9 @@ def process_file(glueContext, file):
         # Fill missing price columns with nulls
         for price_col in price_columns:
             if price_col in station_schema["prices"].dataType.fieldNames():
-                selected_columns.append(col(f"station.prices.{price_col}").alias(f"price_{price_col}"))
+                selected_columns.append(col(f"station.prices.{price_col}").cast(DoubleType()).alias(f"price_{price_col}"))
             else:
-                selected_columns.append(lit(None).cast("double").alias(f"price_{price_col}"))
+                selected_columns.append(lit(None).cast(DoubleType()).alias(f"price_{price_col}"))
 
         df_flattened = df_exploded.select(*selected_columns).withColumn("last_updated_date", to_date("last_updated")).withColumn("last_updated_time", date_format("last_updated", "HH:mm:ss"))
         # Convert back to Dynamic Frame
@@ -137,7 +139,7 @@ def main():
     
     new_files = get_new_files(s3_client, bucket, last_run_time)
     for file in new_files:
-        process_file(glueContext, file)
+        process_file(glueContext, spark, file)
     job.commit()
 
 if __name__ == "__main__":
