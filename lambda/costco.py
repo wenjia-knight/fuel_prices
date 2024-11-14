@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import boto3
+from concurrent.futures import ThreadPoolExecutor
 
 # Set up S3 client
 s3 = boto3.client("s3")
@@ -65,12 +66,16 @@ def get_station_data(url):
         return station_data
 
 def get_data(urls: list):
-    all_data = []   
-    for url in urls:
-        station_data = get_station_data(url)
-        if station_data:
-            all_data.append(station_data)
-    return all_data 
+    # all_data = []   
+    # for url in urls:
+    #     station_data = get_station_data(url)
+    #     if station_data:
+    #         all_data.append(station_data)
+    # return all_data 
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(get_station_data, urls))
+    all_data = [result for result in results if result]
+    return all_data
 
 def get_final_data(data: list):
     final_data = {
